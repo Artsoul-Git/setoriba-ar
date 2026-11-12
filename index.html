@@ -273,7 +273,8 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
     sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
     sceneEl.setAttribute('renderer', 'colorManagement: true; antialias: true');
     sceneEl.setAttribute('cursor', 'rayOrigin: mouse; fuse: false');
-    sceneEl.setAttribute('raycaster', 'objects: .hit; far: 100');
+    // 押す判定の光線の届く距離。カメラのときは MindAR が地図を「画素」の大きさで遠くに置くので、十分に長くする（100 では札まで届かず押せなかった）
+    sceneEl.setAttribute('raycaster', 'objects: .hit; far: 100000');
     var cam = document.createElement('a-camera');
     cam.setAttribute('position', '0 0 0'); cam.setAttribute('look-controls', 'enabled: false');
     cam.setAttribute('wasd-controls', 'enabled: false');
