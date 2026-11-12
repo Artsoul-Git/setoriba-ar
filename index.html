@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>セトリバ 絵地図AR（デモ）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Yusei+Magic&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#3B3226; --sub:#6E6352; --paper:#FFFDF7; --cream:#FAF3E1; --sand:#F1E4C4;
+    --mustard:#F2CB45; --mustard-d:#D9A91C; --green:#2F6B3E; --brick:#C8603A;
+    --font:"Zen Maru Gothic",system-ui,sans-serif; --hand:"Yusei Magic","Zen Maru Gothic",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#1f1a14;color:var(--ink);font-family:var(--font);overflow:hidden}
+  a{color:inherit}
+
+  /* はじめの画面 */
+  #start{position:fixed;inset:0;z-index:30;background:var(--cream);overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+  #start .box{max-width:520px;width:100%;background:var(--paper);border:3px solid var(--ink);border-radius:22px;padding:26px 22px;box-shadow:6px 6px 0 var(--sand)}
+  #start h1{font-family:var(--hand);font-weight:400;font-size:28px;margin:0 0 4px;line-height:1.3}
+  #start .en{color:var(--brick);font-size:14px;margin:0 0 16px}
+  #start img{width:100%;height:auto;border-radius:12px;border:2px solid var(--sand);display:block;margin:0 0 14px}
+  #start ol{margin:0 0 18px;padding-left:1.4em;line-height:1.8;font-size:15px}
+  .btn{display:block;width:100%;font:inherit;font-weight:700;font-size:17px;padding:14px 16px;border-radius:999px;border:3px solid var(--ink);cursor:pointer;margin:0 0 10px;text-align:center;text-decoration:none}
+  .btn.main{background:var(--mustard);color:var(--ink)}
+  .btn.sub{background:var(--paper);color:var(--ink)}
+  #start .links{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:14px;margin-top:6px}
+  #start .demo{font-size:12px;color:var(--sub);margin:14px 0 0;line-height:1.6}
+  #start .err{display:none;background:#fff1ec;border:2px solid var(--brick);border-radius:12px;padding:10px 12px;font-size:14px;margin:0 0 12px;line-height:1.6}
+
+  /* 上の帯 */
+  #bar{position:fixed;top:0;left:0;right:0;z-index:20;display:none;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:linear-gradient(#000a,#0000);color:#fff}
+  #bar b{font-family:var(--hand);font-weight:400;font-size:18px;flex:1;text-shadow:0 1px 3px #000}
+  #bar button{font:inherit;font-size:13px;font-weight:700;border-radius:999px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);padding:7px 12px;cursor:pointer}
+  #bar button[aria-pressed="true"]{background:var(--mustard)}
+
+  /* かざす案内 */
+  #hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:15;display:none;pointer-events:none;text-align:center;color:#fff;text-shadow:0 1px 4px #000}
+  #hint .frame{width:min(78vw,520px);aspect-ratio:1400/933;border:3px dashed #fffc;border-radius:14px;margin:0 auto 12px}
+  #hint p{margin:0;font-weight:700;font-size:16px}
+
+  /* 説明の札 */
+  #card{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);z-index:25;width:min(94vw,460px);background:var(--paper);border:3px solid var(--ink);border-radius:18px;padding:14px 16px 12px;box-shadow:5px 5px 0 #0004;display:none}
+  #card .t{display:inline-block;background:var(--green);color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px}
+  #card h2{font-size:19px;margin:6px 0 4px;line-height:1.35}
+  #card p{margin:0 0 8px;font-size:14.5px;line-height:1.7}
+  #card .row{display:flex;gap:8px;align-items:center}
+  #card .row a{flex:1;font-weight:700;font-size:14px;color:var(--green)}
+  #card .row button{font:inherit;font-size:13px;font-weight:700;border:2px solid var(--ink);border-radius:999px;background:var(--cream);padding:6px 12px;cursor:pointer}
+  #card .x{position:absolute;right:8px;top:6px;border:0;background:none;font-size:22px;cursor:pointer;color:var(--sub);padding:4px 8px}
+  #card small{display:block;font-size:11px;color:var(--sub);margin-top:6px}
+
+  #help{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);z-index:18;display:none;background:#000a;color:#fff;font-size:13px;padding:7px 14px;border-radius:999px;white-space:nowrap}
+
+  a-scene{position:fixed!important;inset:0}
+  .a-enter-vr,.a-enter-ar{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="start">
+  <div class="box">
+    <h1>セトリバの絵地図に<br>スマホをかざしてみよう</h1>
+    <p class="en">setoriba picture map AR ― demo</p>
+    <img src="img/map_real.jpg" alt="瀬戸内市の絵地図。左に吉井川、右下に牛窓の港と島々" width="1400" height="933">
+    <ol>
+      <li>この絵地図を、紙に印刷するか別の画面に出す</li>
+      <li>「カメラでかざす」を押して、カメラを許可する</li>
+      <li>絵地図が画面に入ると、行き先の札が立ち上がる。札を押すと説明が出る</li>
+    </ol>
+    <div class="err" id="err"></div>
+    <button class="btn main" id="goCam" type="button">📷 カメラでかざす</button>
+    <button class="btn sub" id="goPrev" type="button">🖱 カメラなしで見る（下見）</button>
+    <div class="links">
+      <a href="print.html" target="_blank" rel="noopener">印刷用の絵地図（A4横）</a>
+    </div>
+    <p class="demo">※ セトリバは企画中の構想を見せるためのデモです。施設・料金・時間はすべて仮で、車の時間は目安です。カメラの映像はこの画面の中で使うだけで、どこにも送りません。</p>
+  </div>
+</div>
+
+<div id="bar">
+  <b>セトリバ 絵地図AR</b>
+  <button id="tour" type="button" aria-pressed="false">▶ 順番に紹介</button>
+  <button id="back" type="button">戻る</button>
+</div>
+
+<div id="hint"><div class="frame"></div><p>絵地図をこの枠に入れてください</p></div>
+<div id="help">ドラッグで傾ける・ホイールで寄る／札を押すと説明</div>
+
+<div id="card" role="dialog" aria-live="polite">
+  <button class="x" type="button" aria-label="閉じる">×</button>
+  <span class="t" id="cT"></span>
+  <h2 id="cH"></h2>
+  <p id="cP"></p>
+  <div class="row">
+    <a id="cA" href="#" target="_blank" rel="noopener"></a>
+    <button type="button" id="cPrev">◀ 前</button>
+    <button type="button" id="cNext">次 ▶</button>
+  </div>
+  <small>デモ：施設・料金・時間は仮／車の時間は目安</small>
+</div>
+
+<script src="pins.js"></script>
+<script>
+(function(){
+  'use strict';
+  var PINS = window.SETORIBA_PINS || [];
+  var ASPECT = 933 / 1400;              // 絵地図の 高さ／幅（目印の平面は 幅1）
+  var LIBS = {
+    aframe: 'https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-v1.5.0.min.js',
+    mindar: 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js'
+  };
+  var mode = null, sceneEl = null, root = null, labels = [], current = -1, tourTimer = null;
+
+  function $(id){ return document.getElementById(id); }
+  function loadScript(src){
+    return new Promise(function(ok, ng){
+      var s = document.createElement('script'); s.src = src; s.onload = ok;
+      s.onerror = function(){ ng(new Error('読み込めません: ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  function showErr(msg){ var e = $('err'); e.textContent = msg; e.style.display = 'block'; }
+
+  // ％ → 目印の平面の座標（中心が原点・右が+x・上が+y）
+  function toXY(p){ return { x: p[0] / 100 - 0.5, y: (0.5 - p[1] / 100) * ASPECT }; }
+
+  // 札の絵（キャンバス）
+  function drawLabel(pin, active){
+    var c = document.createElement('canvas'), g = c.getContext('2d');
+    var H = 96, pad = 26, font = '700 46px "Zen Maru Gothic", sans-serif';
+    g.font = font;
+    var text = pin.icon + ' ' + pin.name;
+    var W = Math.ceil(g.measureText(text).width + pad * 2);
+    c.width = W + 8; c.height = H + 14;
+    g = c.getContext('2d'); g.font = font;
+    var bg = pin.home ? '#2F6B3E' : (active ? '#F2CB45' : '#FFFDF7');
+    var fg = pin.home ? '#FFFFFF' : '#3B3226';
+    function pill(x, y, w, h, r){ g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+    g.fillStyle = 'rgba(0,0,0,.28)'; pill(8, 12, W - 4, H - 4, (H - 4) / 2); g.fill();
+    g.fillStyle = bg; g.strokeStyle = '#3B3226'; g.lineWidth = 6;
+    pill(3, 3, W - 4, H - 4, (H - 4) / 2); g.fill(); g.stroke();
+    g.fillStyle = fg; g.textBaseline = 'middle'; g.fillText(text, pad, H / 2 + 2);
+    return c;
+  }
+
+  function registerComponents(){
+    // キャンバスを平面の絵として貼る
+    AFRAME.registerComponent('pin-label', {
+      schema: { index: { type: 'int' } },
+      // geometry／material の部品は使わず、自前の板を置く（部品があると絵が上書きされる）
+      init: function(){
+        this.h = PINS[this.data.index].home ? 0.05 : 0.036;
+        this.mat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, alphaTest: 0.01 });
+        this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.mat);
+        this.el.setObject3D('mesh', this.mesh);
+        this.paint(false);
+      },
+      paint: function(active){
+        var c = drawLabel(PINS[this.data.index], active);
+        var tex = new THREE.CanvasTexture(c);
+        if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 4;
+        if (this.mat.map) this.mat.map.dispose();
+        this.mat.map = tex; this.mat.needsUpdate = true;
+        this.mesh.scale.set(this.h * c.width / c.height, this.h, 1);
+      }
+    });
+  }
+
+  function buildPins(){
+    PINS.forEach(function(pin, i){
+      var at = toXY(pin.at), lb = toXY(pin.label);
+      var lift = pin.home ? 0.11 : 0.07;
+      var g = document.createElement('a-entity');
+      g.setAttribute('position', at.x + ' ' + at.y + ' 0');
+      g.setAttribute('scale', '0.001 0.001 0.001');
+      g.setAttribute('animation__in', 'property: scale; from: 0.001 0.001 0.001; to: 1 1 1; dur: 650; easing: easeOutBack; delay: ' + (i * 70) + '; startEvents: reveal');
+
+      // 実際の場所の印
+      var dot = document.createElement('a-circle');
+      dot.setAttribute('radius', pin.home ? 0.011 : 0.007);
+      dot.setAttribute('position', '0 0 0.002');
+      dot.setAttribute('material', 'shader: flat; color: ' + (pin.home ? '#2F6B3E' : '#C8603A'));
+      g.appendChild(dot);
+
+      // 場所から札へのびる線
+      var line = document.createElement('a-entity');
+      line.setAttribute('line', 'start: 0 0 0.002; end: ' + (lb.x - at.x) + ' ' + (lb.y - at.y) + ' ' + lift + '; color: #3B3226');
+      g.appendChild(line);
+
+      // 札
+      var lab = document.createElement('a-entity');
+      lab.setAttribute('class', 'hit');
+      lab.setAttribute('position', (lb.x - at.x) + ' ' + (lb.y - at.y) + ' ' + lift);
+      lab.setAttribute('pin-label', 'index: ' + i);
+      lab.dataset.index = i;
+      lab.addEventListener('click', function(){ if (!dragMoved) select(i, true); });
+      g.appendChild(lab);
+
+      root.appendChild(g);
+      labels.push({ group: g, label: lab });
+    });
+  }
+
+  function reveal(){
+    labels.forEach(function(l){ l.group.setAttribute('scale', '0.001 0.001 0.001'); l.group.emit('reveal'); });
+  }
+
+  function select(i, byHand){
+    if (byHand) stopTour();
+    if (current >= 0 && labels[current]) {
+      var prev = labels[current].label;
+      prev.components['pin-label'].paint(false); prev.setAttribute('scale', '1 1 1');
+    }
+    current = i;
+    var pin = PINS[i], l = labels[i].label;
+    l.components['pin-label'].paint(true); l.setAttribute('scale', '1.35 1.35 1.35');
+    $('cT').textContent = pin.tag; $('cH').textContent = pin.title; $('cP').textContent = pin.text;
+    var a = $('cA'); a.textContent = pin.linkText || ''; a.href = pin.href || '#'; a.style.visibility = pin.href ? 'visible' : 'hidden';
+    $('card').style.display = 'block'; $('help').style.display = 'none';
+  }
+  function closeCard(){
+    if (current >= 0) { var l = labels[current].label; l.components['pin-label'].paint(false); l.setAttribute('scale', '1 1 1'); }
+    current = -1; $('card').style.display = 'none';
+    if (mode === 'preview') $('help').style.display = 'block';
+  }
+  function step(d){ select((current + d + PINS.length) % PINS.length, false); }
+  function startTour(){
+    $('tour').setAttribute('aria-pressed', 'true'); $('tour').textContent = '■ 止める';
+    if (current < 0) select(0, false); else step(1);
+    tourTimer = setInterval(function(){ step(1); }, 4500);
+  }
+  function stopTour(){
+    clearInterval(tourTimer); tourTimer = null;
+    $('tour').setAttribute('aria-pressed', 'false'); $('tour').textContent = '▶ 順番に紹介';
+  }
+
+  // カメラなしの下見：ドラッグで傾ける・ホイールで寄る
+  var dragMoved = false;
+  function setupPreviewControls(){
+    var rx = -32, ry = 0, dist = 1.0, down = null;
+    // 地図（幅1）が横に少し余白を残して収まる距離（縦の視野80°）
+    function fitDist(){ var a = innerWidth / innerHeight; return Math.max(0.7, (a < 1 ? 1.02 : 1.4) / (1.678 * a)); }
+    dist = fitDist();
+    function apply(){ root.setAttribute('rotation', rx + ' ' + ry + ' 0'); root.setAttribute('position', '0 0 ' + (-dist)); }
+    apply();
+    var cv = sceneEl.canvas;
+    cv.addEventListener('pointerdown', function(e){ down = { x: e.clientX, y: e.clientY, rx: rx, ry: ry }; dragMoved = false; });
+    addEventListener('pointermove', function(e){
+      if (!down) return;
+      var dx = e.clientX - down.x, dy = e.clientY - down.y;
+      if (Math.abs(dx) + Math.abs(dy) > 6) dragMoved = true;
+      ry = Math.max(-60, Math.min(60, down.ry + dx * 0.25));
+      rx = Math.max(-80, Math.min(0, down.rx + dy * 0.25));
+      apply();
+    });
+    addEventListener('pointerup', function(){ down = null; setTimeout(function(){ dragMoved = false; }, 0); });
+    cv.addEventListener('wheel', function(e){ e.preventDefault(); dist = Math.max(0.45, Math.min(2.2, dist + e.deltaY * 0.001)); apply(); }, { passive: false });
+    addEventListener('resize', function(){ dist = fitDist(); apply(); });
+  }
+
+  function makeScene(){
+    sceneEl = document.createElement('a-scene');
+    sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+    sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+    sceneEl.setAttribute('renderer', 'colorManagement: true; antialias: true');
+    sceneEl.setAttribute('cursor', 'rayOrigin: mouse; fuse: false');
+    sceneEl.setAttribute('raycaster', 'objects: .hit; far: 100');
+    var cam = document.createElement('a-camera');
+    cam.setAttribute('position', '0 0 0'); cam.setAttribute('look-controls', 'enabled: false');
+    cam.setAttribute('wasd-controls', 'enabled: false');
+
+    root = document.createElement('a-entity');
+    if (mode === 'camera') {
+      sceneEl.setAttribute('mindar-image', 'imageTargetSrc: targets.mind; uiScanning: no; uiLoading: yes; filterMinCF: 0.0001; filterBeta: 0.001');
+      sceneEl.setAttribute('embedded', '');
+      root.setAttribute('mindar-image-target', 'targetIndex: 0');
+      root.addEventListener('targetFound', function(){ $('hint').style.display = 'none'; reveal(); });
+      root.addEventListener('targetLost', function(){ $('hint').style.display = 'block'; });
+    } else {
+      sceneEl.setAttribute('background', 'color: #2a241c');
+      var map = document.createElement('a-plane');
+      map.setAttribute('width', 1); map.setAttribute('height', ASPECT);
+      map.setAttribute('material', 'shader: flat; src: img/map_real.jpg');
+      root.appendChild(map);
+    }
+    sceneEl.appendChild(cam); sceneEl.appendChild(root);
+    document.body.appendChild(sceneEl);
+    buildPins();
+    sceneEl.addEventListener('loaded', function(){
+      if (mode === 'preview') { setupPreviewControls(); setTimeout(reveal, 300); $('help').style.display = 'block'; }
+      else { $('hint').style.display = 'block'; }
+    });
+    if (mode === 'camera') {
+      sceneEl.addEventListener('arError', function(){
+        location.href = location.pathname + '?err=camera';
+      });
+    }
+  }
+
+  function start(m){
+    mode = m;
+    $('goCam').disabled = $('goPrev').disabled = true;
+    var need = [document.fonts ? document.fonts.load('700 46px "Zen Maru Gothic"') : Promise.resolve(), loadScript(LIBS.aframe)];
+    Promise.all(need)
+      .then(function(){ return m === 'camera' ? loadScript(LIBS.mindar) : null; })
+      .then(function(){
+        registerComponents();
+        $('start').style.display = 'none'; $('bar').style.display = 'flex';
+        makeScene();
+      })
+      .catch(function(e){
+        $('goCam').disabled = $('goPrev').disabled = false;
+        showErr('部品を読み込めませんでした。インターネットにつながっているか確かめてください。（' + e.message + '）');
+      });
+  }
+
+  $('goCam').addEventListener('click', function(){
+    if (!window.isSecureContext) { showErr('カメラは https のページでしか使えません。下の「カメラなしで見る」なら、このまま見られます。'); return; }
+    start('camera');
+  });
+  $('goPrev').addEventListener('click', function(){ start('preview'); });
+  $('back').addEventListener('click', function(){ location.href = location.pathname; });
+  $('tour').addEventListener('click', function(){ tourTimer ? stopTour() : startTour(); });
+  document.querySelector('#card .x').addEventListener('click', function(){ stopTour(); closeCard(); });
+  $('cPrev').addEventListener('click', function(){ stopTour(); step(-1); });
+  $('cNext').addEventListener('click', function(){ stopTour(); step(1); });
+
+  if (matchMedia('(pointer: coarse)').matches) $('help').textContent = '指で動かすと傾く／札を押すと説明';
+  var q = new URLSearchParams(location.search);
+  if (q.get('err') === 'camera') showErr('カメラを使えませんでした。カメラの許可を確かめるか、「カメラなしで見る」をお使いください。');
+  if (q.get('mode') === 'preview') start('preview');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>セトリバ 絵地図（AR用・印刷）</title>
+<style>
+  @page{size:A4 landscape;margin:8mm}
+  :root{--ink:#3B3226;--sub:#6E6352}
+  body{margin:0;background:#fff;color:var(--ink);font-family:"Zen Maru Gothic",system-ui,sans-serif}
+  .sheet{max-width:1100px;margin:0 auto;padding:12px 16px}
+  header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 6px}
+  h1{font-size:18px;margin:0}
+  p{margin:0;font-size:12px;color:var(--sub)}
+  img{display:block;width:100%;height:auto}
+  .tip{margin:12px 0 0;font-size:13px;line-height:1.7;color:var(--ink)}
+  @media print{.tip{display:none}.sheet{padding:0;max-width:none} img{max-height:178mm;width:auto;max-width:100%;margin:0 auto}}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header>
+    <h1>⛺ セトリバの絵地図 ― スマホをかざすと、行き先の札が立ち上がります</h1>
+    <p>デモ：施設・料金・時間は仮／車の時間は目安</p>
+  </header>
+  <img src="img/map_real.jpg" alt="瀬戸内市の絵地図" width="1400" height="933">
+  <p class="tip">印刷のこつ：A4横・カラー・「余白なし」より「縮小して全体を印刷」。光沢紙は照明が映り込んで読み取りにくいので、ふつうの紙がおすすめです。印刷しなくても、この画面をパソコンに大きく出してスマホをかざしても動きます。</p>
+</div>
+</body>
+</html>
