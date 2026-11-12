@@ -18,6 +18,8 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:#1f1a14;color:var(--ink);font-family:var(--font);overflow:hidden}
   a{color:inherit}
+  /* カメラのときは背景を塗らない：映像は画面の後ろ（z-index:-2）に置かれるので、塗ると隠れて真っ黒になる */
+  html.cam,html.cam body{background:transparent}
 
   /* はじめの画面 */
   #start{position:fixed;inset:0;z-index:30;background:var(--cream);overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px 16px}
@@ -278,6 +280,7 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
 
     root = document.createElement('a-entity');
     if (mode === 'camera') {
+      document.documentElement.classList.add('cam');
       sceneEl.setAttribute('mindar-image', 'imageTargetSrc: targets.mind; uiScanning: no; uiLoading: yes; filterMinCF: 0.0001; filterBeta: 0.001');
       sceneEl.setAttribute('embedded', '');
       root.setAttribute('mindar-image-target', 'targetIndex: 0');
