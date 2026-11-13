@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>リバと いきもの さがし（デモ）</title>
+<script>/* カメラは https でしか動かないので、公開先を http で開いたら https へ移す */
+if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) location.replace('https://' + location.host + location.pathname + location.search);</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Yusei+Magic&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#3B3226;--sub:#6E6352;--paper:#FFFDF7;--cream:#FAF3E1;--sand:#F1E4C4;--mustard:#F2CB45;--green:#2F6B3E;--brick:#C8603A;--sky:#DDEFF3;--water:#4FA8C9;
+    --font:"Zen Maru Gothic",system-ui,sans-serif;--hand:"Yusei Magic","Zen Maru Gothic",sans-serif}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#1f1a14;color:var(--ink);font-family:var(--font);overflow:hidden}
+  /* カメラのときは背景を塗らない（映像は画面の後ろに置かれるので、塗ると真っ黒になる） */
+  html.cam,html.cam body{background:transparent}
+  #start{position:fixed;inset:0;z-index:30;background:var(--sky);overflow:auto;display:flex;align-items:center;justify-content:center;padding:20px 16px}
+  #start .box{max-width:480px;width:100%;background:var(--paper);border:3px solid var(--ink);border-radius:24px;padding:22px 20px;box-shadow:6px 6px 0 #9fcfdc;text-align:center}
+  #start h1{font-family:var(--hand);font-weight:400;font-size:30px;margin:0 0 6px;line-height:1.35}
+  #start img{width:72%;height:auto;display:block;margin:0 auto 10px}
+  #start p.lead{font-size:16px;line-height:1.8;margin:0 0 14px;font-weight:700}
+  .btn{display:block;width:100%;font:inherit;font-weight:900;font-size:19px;padding:15px 16px;border-radius:999px;border:3px solid var(--ink);cursor:pointer;margin:0 0 10px}
+  .btn.main{background:var(--mustard)}.btn.sub{background:var(--paper);font-size:16px}
+  #start .links{font-size:14px;margin-top:4px}
+  #start .note{font-size:12px;color:var(--sub);margin:12px 0 0;line-height:1.6;text-align:left}
+  #err{display:none;background:#fff1ec;border:2px solid var(--brick);border-radius:12px;padding:10px 12px;font-size:14px;margin:0 0 12px;line-height:1.6;text-align:left}
+
+  #bar{position:fixed;top:0;left:0;right:0;z-index:20;display:none;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:linear-gradient(#0008,#0000);color:#fff}
+  #bar .count{flex:1;font-weight:900;font-size:17px;text-shadow:0 1px 3px #000}
+  #bar .count i{font-style:normal;display:inline-block;width:26px;height:26px;line-height:22px;text-align:center;border:2px solid #fff;border-radius:50%;margin-right:3px;font-size:14px;background:#0003}
+  #bar .count i.got{background:var(--mustard);color:var(--ink);border-color:var(--ink)}
+  #bar button{font:inherit;font-size:14px;font-weight:900;border-radius:999px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);padding:7px 12px;cursor:pointer}
+
+  #hint{position:fixed;left:50%;top:48%;transform:translate(-50%,-50%);z-index:15;display:none;pointer-events:none;text-align:center;color:#fff;text-shadow:0 1px 4px #000}
+  #hint .frame{width:min(70vw,420px);aspect-ratio:1/1;border:4px dashed #fffc;border-radius:22px;margin:0 auto 12px}
+  #hint p{margin:0;font-weight:900;font-size:18px}
+
+  #talk{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);z-index:25;width:min(94vw,460px);background:var(--paper);border:3px solid var(--ink);border-radius:22px;padding:14px 16px 12px 70px;box-shadow:5px 5px 0 #0004;display:none;min-height:88px}
+  #talk .face{position:absolute;left:12px;top:14px;width:48px;height:48px;border-radius:50%;background:#7fd0ea;border:3px solid var(--ink);font-size:24px;line-height:42px;text-align:center}
+  #talk .who{font-weight:900;font-size:13px;color:var(--water)}
+  #talk p{margin:2px 0 0;font-size:18px;line-height:1.6;font-weight:700}
+  #talk .next{position:absolute;right:12px;bottom:8px;font:inherit;font-weight:900;font-size:14px;border:2px solid var(--ink);border-radius:999px;background:var(--mustard);padding:4px 12px;cursor:pointer}
+
+  #card{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.6);opacity:0;z-index:28;width:min(86vw,360px);background:var(--paper);border:4px solid var(--ink);border-radius:24px;padding:18px 18px 14px;text-align:center;box-shadow:6px 6px 0 #0005;transition:transform .35s cubic-bezier(.3,1.6,.5,1),opacity .2s;pointer-events:none}
+  #card.show{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto}
+  #card .got{display:inline-block;background:var(--brick);color:#fff;font-weight:900;font-size:14px;border-radius:999px;padding:3px 12px}
+  #card h2{font-family:var(--hand);font-weight:400;font-size:30px;margin:8px 0 2px}
+  #card .no{font-size:13px;color:var(--sub);font-weight:700}
+  #card p{font-size:16px;line-height:1.7;margin:8px 0 12px;font-weight:700}
+  #card button{font:inherit;font-weight:900;font-size:16px;border:3px solid var(--ink);border-radius:999px;background:var(--mustard);padding:8px 22px;cursor:pointer}
+
+  #done{position:fixed;inset:0;z-index:29;display:none;align-items:center;justify-content:center;background:#0006;padding:16px}
+  #done .box{max-width:420px;background:var(--paper);border:4px solid var(--ink);border-radius:24px;padding:20px 18px;text-align:center}
+  #done h2{font-family:var(--hand);font-weight:400;font-size:28px;margin:0 0 8px}
+  #done .zukan{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
+  #done .zukan span{background:var(--cream);border:2px solid var(--sand);border-radius:12px;padding:4px 8px;font-weight:900;font-size:14px}
+  #done p{font-size:16px;line-height:1.75;font-weight:700;margin:0 0 12px}
+  #done .adult{font-size:12px;color:var(--sub);font-weight:500;text-align:left;margin-top:10px}
+  a-scene{position:fixed!important;inset:0}
+  .a-enter-vr,.a-enter-ar{display:none!important}
+</style>
+</head>
+<body>
+<div id="start">
+  <div class="box">
+    <h1>リバと いっしょに<br>いきもの さがし</h1>
+    <img src="../img/ill_river_kids.jpg" alt="池で生き物をすくう親子の絵" width="768" height="768">
+    <p class="lead">この えに スマホを かざすと<br>しずくの「リバ」が でてくるよ！</p>
+    <div id="err"></div>
+    <button class="btn main" id="goCam" type="button">📷 かざして はじめる</button>
+    <button class="btn sub" id="goPrev" type="button">🖐 カメラなしで あそぶ</button>
+    <div class="links"><a href="flyer.html" target="_blank" rel="noopener">いんさつ用の チラシ（A4）</a></div>
+    <p class="note">おうちの方へ：セトリバは企画中のキャンプ場のデモです。リバと生き物は絵と仕組みの見本で、実際の池にいる生き物を約束するものではありません。音声はスマホの読み上げ機能を使います（🔊で止められます）。カメラの映像はこの画面の中で使うだけで、どこにも送りません。</p>
+  </div>
+</div>
+
+<div id="bar"><div class="count" id="count"></div><button id="snd" type="button">🔊</button><button id="back" type="button">もどる</button></div>
+<div id="hint"><div class="frame"></div><p>えを この わくに いれてね</p></div>
+
+<div id="talk"><div class="face">💧</div><div class="who">リバ</div><p id="line"></p><button class="next" id="nextBtn" type="button">つぎ ▶</button></div>
+
+<div id="card" role="dialog"><span class="got">つかまえた！</span><h2 id="kName"></h2><div class="no" id="kNo"></div><p id="kText"></p><button id="kOk" type="button">ずかんに いれる</button></div>
+
+<div id="done"><div class="box"><h2>ぜんぶ みつけた！</h2><div class="zukan" id="zukan"></div>
+  <p>すごい！ ほんものの いきものは、<br>セトリバの「いきもの池」で<br>ながぐつを はいて さがしてみよう。</p>
+  <button class="btn main" id="again" type="button">もういちど あそぶ</button>
+  <p class="adult">おうちの方へ：セトリバ（デモ）は吉井川の河川敷に構想中のファミリーキャンプ場です。いきもの池は川の水が入るビオトープの計画で、生き物さがしは長靴を貸し出す想定です（いずれも計画段階）。</p></div></div>
+
+<script>
+(function(){
+  'use strict';
+  var LIBS = {
+    aframe: 'https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-v1.5.0.min.js',
+    mindar: 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js'
+  };
+  // 池の生き物（説明は子ども向けに、一般に知られていることだけ）
+  var KIDS = [
+    { id: 'medaka', name: 'メダカ', text: 'おがわや たんぼに すむ ちいさな さかな。みんなで むれに なって およぐよ。' },
+    { id: 'otama', name: 'オタマジャクシ', text: 'カエルの こども。あしが はえて、しっぽが なくなると カエルに なるよ。' },
+    { id: 'yago', name: 'ヤゴ', text: 'トンボの こども。みずの なかで くらして、おとなに なると とびたつよ。' },
+    { id: 'amenbo', name: 'アメンボ', text: 'みずの うえを すいすい すべるように あるく むし。ながい あしが じまん。' },
+    { id: 'dojo', name: 'ドジョウ', text: 'くちに ひげが ある さかな。どろの なかに もぐるのが とくい。' }
+  ];
+  var INTRO = [
+    'やあ！ ぼくは リバ。よしいがわの しずくだよ。',
+    'セトリバの「いきもの池」には、いろんな いきものが かくれているんだ。',
+    'えの いけの まわりを みてごらん。いきものを タッチして つかまえてね！ ぜんぶで 5ひき だよ。'
+  ];
+  var mode = null, sceneEl = null, root = null, riba = null, critters = [], got = {}, talking = false, sound = true, lineQueue = [], started = false, dragMoved = false;
+  function $(id){ return document.getElementById(id); }
+  function loadScript(src){ return new Promise(function(ok, ng){ var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function(){ ng(new Error(src)); }; document.head.appendChild(s); }); }
+
+  // ---- 声と吹き出し ----
+  var voice = null;
+  function pickVoice(){ if (!window.speechSynthesis) return; var vs = speechSynthesis.getVoices().filter(function(v){ return /ja/i.test(v.lang); }); voice = vs[0] || null; }
+  if (window.speechSynthesis) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  function say(text, done){
+    $('talk').style.display = 'block'; $('line').textContent = text; talking = true;
+    var finish = function(){ talking = false; if (done) done(); };
+    if (sound && window.speechSynthesis) {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text.replace(/「|」/g, ''));
+      u.lang = 'ja-JP'; if (voice) u.voice = voice; u.rate = 1.05; u.pitch = 1.5;
+      u.onend = finish; u.onerror = finish; speechSynthesis.speak(u);
+      setTimeout(function(){ if (talking) finish(); }, 1200 + text.length * 160);   // 読み上げが動かない端末の保険
+    } else setTimeout(finish, 900 + text.length * 90);
+  }
+  function playLines(lines, end){
+    lineQueue = lines.slice();
+    var next = function(){ if (!lineQueue.length) { if (end) end(); return; } say(lineQueue.shift(), function(){ $('nextBtn').dataset.wait = '1'; }); };
+    $('nextBtn').onclick = function(){ if (window.speechSynthesis) speechSynthesis.cancel(); talking = false; next(); };
+    next();
+  }
+
+  // ---- 立体の部品（A-Frame の THREE で組む） ----
+  function M(THREE, c, o){ return new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.55, metalness: 0 }, o || {})); }
+  function makeRiba(THREE){
+    var g = new THREE.Group();
+    var body = new THREE.Mesh(new THREE.SphereGeometry(0.1, 32, 24), M(THREE, '#7fd0ea', { roughness: 0.25, transparent: true, opacity: 0.95 }));
+    body.scale.set(1, 1.05, 0.95); g.add(body);
+    var shine = new THREE.Mesh(new THREE.SphereGeometry(0.022, 16, 12), M(THREE, '#ffffff', { emissive: '#ffffff', emissiveIntensity: 0.4 })); shine.position.set(-0.05, 0.045, 0.075); shine.scale.set(0.6, 1.1, 0.4); g.add(shine);
+    [-1, 1].forEach(function(s){
+      var eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 16, 12), M(THREE, '#ffffff')); eye.position.set(0.035 * s, 0.02, 0.088); eye.scale.z = 0.5; g.add(eye);
+      var pupil = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 10), M(THREE, '#2a2420')); pupil.position.set(0.035 * s, 0.018, 0.098); pupil.name = 'pupil'; g.add(pupil);
+      var cheek = new THREE.Mesh(new THREE.SphereGeometry(0.014, 12, 10), M(THREE, '#f4a3a3')); cheek.position.set(0.062 * s, -0.012, 0.075); cheek.scale.z = 0.4; g.add(cheek);
+      var arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.012, 0.05, 4, 8), M(THREE, '#7fd0ea')); arm.position.set(0.1 * s, -0.01, 0); arm.rotation.z = s * 0.9; arm.name = s > 0 ? 'armR' : 'armL'; g.add(arm);
+      var foot = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 10), M(THREE, '#5fb6d4')); foot.position.set(0.04 * s, -0.1, 0.01); foot.scale.set(1, 0.5, 1.3); g.add(foot);
+    });
+    var mouth = new THREE.Mesh(new THREE.SphereGeometry(0.016, 16, 10), M(THREE, '#8a2f2f')); mouth.position.set(0, -0.022, 0.092); mouth.scale.set(1.2, 0.35, 0.5); mouth.name = 'mouth'; g.add(mouth);
+    // 子どもたちと同じ ぼうし
+    var brim = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.008, 32), M(THREE, '#e9d3a3')); brim.position.y = 0.11; g.add(brim);
+    var crown = new THREE.Mesh(new THREE.SphereGeometry(0.058, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), M(THREE, '#e9d3a3')); crown.position.y = 0.112; g.add(crown);
+    var band = new THREE.Mesh(new THREE.CylinderGeometry(0.059, 0.059, 0.016, 32, 1, true), M(THREE, '#6f9f4f')); band.position.y = 0.122; g.add(band);
+    return g;
+  }
+  function makeCritter(THREE, id){
+    var g = new THREE.Group(), body;
+    if (id === 'medaka') {
+      body = new THREE.Mesh(new THREE.SphereGeometry(0.02, 16, 12), M(THREE, '#c9b98f')); body.scale.set(2.2, 0.8, 0.7); g.add(body);
+      var tail = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.03, 3), M(THREE, '#b8a67a')); tail.rotation.z = Math.PI / 2; tail.position.x = -0.055; tail.name = 'tail'; g.add(tail);
+      var e = new THREE.Mesh(new THREE.SphereGeometry(0.006, 8, 8), M(THREE, '#111')); e.position.set(0.032, 0.006, 0.01); g.add(e);
+    } else if (id === 'otama') {
+      body = new THREE.Mesh(new THREE.SphereGeometry(0.02, 16, 12), M(THREE, '#3a3530')); body.scale.set(1.2, 1, 0.9); g.add(body);
+      var t = new THREE.Mesh(new THREE.ConeGeometry(0.01, 0.06, 6), M(THREE, '#5a534a')); t.rotation.z = Math.PI / 2; t.position.x = -0.045; t.name = 'tail'; g.add(t);
+    } else if (id === 'yago') {
+      for (var i = 0; i < 3; i++) { var s = new THREE.Mesh(new THREE.SphereGeometry(0.014 - i * 0.002, 12, 10), M(THREE, '#7a6a3f')); s.position.x = 0.02 - i * 0.022; s.scale.set(1.3, 0.7, 1); g.add(s); }
+      for (var k = 0; k < 6; k++) { var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.002, 0.002, 0.03, 4), M(THREE, '#5c4f2e')); leg.position.set(0.01 - (k % 3) * 0.012, (k < 3 ? 1 : -1) * 0.016, 0); leg.rotation.z = (k < 3 ? 0.4 : -0.4); g.add(leg); }
+    } else if (id === 'amenbo') {
+      body = new THREE.Mesh(new THREE.CapsuleGeometry(0.005, 0.035, 4, 8), M(THREE, '#2b2723')); body.rotation.z = Math.PI / 2; g.add(body);
+      [[0.01, 0.6], [-0.006, 1.2], [-0.012, 2]].forEach(function(p){ [-1, 1].forEach(function(s){ var l = new THREE.Mesh(new THREE.CylinderGeometry(0.0015, 0.0015, 0.05, 4), M(THREE, '#2b2723')); l.position.set(p[0] + Math.cos(p[1]) * 0.02, s * 0.022, 0); l.rotation.z = s * p[1]; g.add(l); }); });
+    } else if (id === 'dojo') {
+      for (var j = 0; j < 5; j++) { var b = new THREE.Mesh(new THREE.SphereGeometry(0.011, 12, 10), M(THREE, '#8e7a55')); b.position.x = 0.04 - j * 0.02; b.scale.set(1.6, 1, 0.9); b.name = 'seg'; g.add(b); }
+      [-1, 1].forEach(function(s){ var w = new THREE.Mesh(new THREE.CylinderGeometry(0.0012, 0.0012, 0.015, 4), M(THREE, '#5a4a30')); w.position.set(0.055, s * 0.006, 0); w.rotation.z = s * 1.1; g.add(w); });
+    }
+    // 押しやすいように見えない大きめの当たり
+    var hit = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), new THREE.MeshBasicMaterial({ visible: false })); g.add(hit);
+    g.userData.hit = hit;
+    return g;
+  }
+
+  // 絵の上の場所（絵の幅を1・中心が原点・右が+x・上が+y）
+  var POND = { cx: -0.1, cy: -0.31, rx: 0.3, ry: 0.11 };
+  function registerComponents(){
+    var THREE = AFRAME.THREE;
+    AFRAME.registerComponent('riba', {
+      init: function(){
+        this.g = makeRiba(THREE); this.g.scale.setScalar(0.001);
+        this.el.setObject3D('mesh', this.g); this.t0 = 0; this.pop = 0; this.blink = 0;
+      },
+      tick: function(t, dt){
+        var g = this.g; if (!g) return;
+        if (this.pop > 0 && this.pop < 1) this.pop = Math.min(1, this.pop + dt / 600);
+        var p = this.pop, s = p < 1 ? (1 + Math.sin(p * Math.PI * 1.5) * (1 - p) * 0.6) * p : 1;
+        g.scale.setScalar(Math.max(0.001, s * 0.95));
+        g.position.y = 0.095 + Math.abs(Math.sin(t / 380)) * 0.025;   // ぴょこぴょこ
+        g.rotation.y = Math.sin(t / 1300) * 0.25;
+        var arm = g.getObjectByName('armR'); if (arm) arm.rotation.z = 0.9 + Math.sin(t / 180) * (talking ? 0.5 : 0.15);
+        var mouth = g.getObjectByName('mouth'); if (mouth) mouth.scale.y = talking ? 0.35 + Math.abs(Math.sin(t / 70)) * 0.9 : 0.35;
+        this.blink -= dt; var open = this.blink > 120 || this.blink < 0; if (this.blink < -2800) this.blink = 3200;
+        g.children.forEach(function(c){ if (c.name === 'pupil') c.scale.y = (this.blink > 0 && this.blink < 120) ? 0.15 : 1; }, this);
+      },
+      appear: function(){ this.pop = 0.001; }
+    });
+    AFRAME.registerComponent('critter', {
+      schema: { index: { type: 'int' } },
+      init: function(){
+        var K = KIDS[this.data.index];
+        this.g = makeCritter(THREE, K.id); this.el.setObject3D('mesh', this.g);
+        this.ph = this.data.index * 1.3; this.speed = [0.55, 0.45, 0.3, 0.9, 0.25][this.data.index]; this.caught = false; this.vis = 0;
+        this.g.visible = false;
+        var self = this;
+        this.el.addEventListener('click', function(){ if (!dragMoved) self.catchIt(); });
+      },
+      show: function(){ this.g.visible = true; this.vis = 0.001; },
+      catchIt: function(){
+        if (this.caught || !this.g.visible) return; this.caught = true; this.jump = 0.001; onCatch(this.data.index);
+      },
+      tick: function(t, dt){
+        var g = this.g; if (!g.visible) return;
+        if (this.vis > 0 && this.vis < 1) this.vis = Math.min(1, this.vis + dt / 500);
+        if (this.jump) {   // つかまえたら 跳ねて消える
+          this.jump += dt / 700; g.position.z = 0.03 + Math.sin(Math.min(this.jump, 1) * Math.PI) * 0.18; g.scale.setScalar(Math.max(0.001, 0.85 * (1 - this.jump)));
+          g.rotation.z += dt / 80; if (this.jump >= 1) g.visible = false; return;
+        }
+        var a = this.ph + t / 1000 * this.speed, i = this.data.index;
+        var rx = POND.rx * (0.55 + 0.4 * ((i * 37) % 10) / 10), ry = POND.ry * (0.5 + 0.45 * ((i * 53) % 10) / 10);
+        var x = POND.cx + Math.cos(a) * rx, y = POND.cy + Math.sin(a * (i % 2 ? 1 : -1)) * ry;
+        if (KIDS[i].id === 'amenbo') { x += Math.sin(t / 260) * 0.02; }
+        g.position.set(x, y, KIDS[i].id === 'amenbo' ? 0.02 : 0.012);
+        var nx = POND.cx + Math.cos(a + 0.02) * rx, ny = POND.cy + Math.sin((a + 0.02) * (i % 2 ? 1 : -1)) * ry;
+        g.rotation.z = Math.atan2(ny - y, nx - x);
+        g.scale.setScalar(0.85 * this.vis);
+        var tail = g.getObjectByName('tail'); if (tail) tail.rotation.y = Math.sin(t / 90) * 0.6;
+        var k = 0; g.children.forEach(function(c){ if (c.name === 'seg') { c.position.y = Math.sin(t / 200 + k) * 0.006; k++; } });
+      }
+    });
+  }
+
+  function buildScene(){
+    sceneEl = document.createElement('a-scene');
+    sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+    sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+    sceneEl.setAttribute('renderer', 'colorManagement: true; antialias: true');
+    sceneEl.setAttribute('cursor', 'rayOrigin: mouse; fuse: false');
+    // 押す判定の光線は十分長く（カメラのとき MindAR は絵を画素の大きさで遠くに置く。短いと届かず押せない）
+    sceneEl.setAttribute('raycaster', 'objects: .hit; far: 100000');
+    var cam = document.createElement('a-camera'); cam.setAttribute('position', '0 0 0'); cam.setAttribute('look-controls', 'enabled: false'); cam.setAttribute('wasd-controls', 'enabled: false');
+    var light = document.createElement('a-entity'); light.setAttribute('light', 'type: hemisphere; color: #fff; groundColor: #b9a888; intensity: 1.3');
+    var light2 = document.createElement('a-entity'); light2.setAttribute('light', 'type: directional; intensity: 1.1'); light2.setAttribute('position', '0.3 1 0.8');
+    root = document.createElement('a-entity');
+    if (mode === 'camera') {
+      document.documentElement.classList.add('cam');
+      sceneEl.setAttribute('mindar-image', 'imageTargetSrc: targets.mind; uiScanning: no; uiLoading: yes; filterMinCF: 0.0001; filterBeta: 0.001');
+      sceneEl.setAttribute('embedded', '');
+      root.setAttribute('mindar-image-target', 'targetIndex: 0');
+      root.addEventListener('targetFound', function(){ $('hint').style.display = 'none'; begin(); });
+      root.addEventListener('targetLost', function(){ $('hint').style.display = 'block'; });
+    } else {
+      sceneEl.setAttribute('background', 'color: #cfe8ef');
+      var pic = document.createElement('a-plane'); pic.setAttribute('width', 1); pic.setAttribute('height', 1);
+      pic.setAttribute('material', 'shader: flat; src: ../img/ill_river_kids.jpg'); root.appendChild(pic);
+    }
+    // リバは絵の右下（デッキの手前）に立つ。立つ向き＝紙から手前（+z）
+    riba = document.createElement('a-entity'); riba.setAttribute('riba', ''); riba.setAttribute('position', '0.36 -0.2 0'); riba.setAttribute('rotation', '90 0 0');
+    var ribaWrap = document.createElement('a-entity'); ribaWrap.appendChild(riba);
+    root.appendChild(ribaWrap);
+    KIDS.forEach(function(K, i){ var c = document.createElement('a-entity'); c.setAttribute('critter', 'index: ' + i); c.setAttribute('class', 'hit'); root.appendChild(c); critters.push(c); });
+    sceneEl.appendChild(cam); sceneEl.appendChild(light); sceneEl.appendChild(light2); sceneEl.appendChild(root);
+    document.body.appendChild(sceneEl);
+    sceneEl.addEventListener('loaded', function(){
+      // リバの当たり（リバを押すと もう一度しゃべる）
+      if (mode === 'preview') { setupPreview(); setTimeout(begin, 400); }
+      else $('hint').style.display = 'block';
+    });
+    if (mode === 'camera') sceneEl.addEventListener('arError', function(){ location.href = location.pathname + '?err=camera'; });
+  }
+
+  function updateCount(){
+    $('count').innerHTML = KIDS.map(function(K){ return '<i class="' + (got[K.id] ? 'got' : '') + '">' + (got[K.id] ? '✓' : '?') + '</i>'; }).join('') + ' ' + Object.keys(got).length + '/5';
+  }
+  function begin(){
+    if (started) return; started = true;
+    riba.components.riba.appear();
+    setTimeout(function(){
+      playLines(INTRO, function(){
+        critters.forEach(function(c, i){ setTimeout(function(){ c.components.critter.show(); }, i * 350); });
+        say('さあ、さがしてみよう！', function(){});
+      });
+    }, 500);
+  }
+  function onCatch(i){
+    var K = KIDS[i]; got[K.id] = 1; updateCount();
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    $('kName').textContent = K.name; $('kNo').textContent = 'ずかん No.' + (i + 1); $('kText').textContent = K.text;
+    $('card').classList.add('show');
+    say(K.name + ' を つかまえた！ ' + K.text, function(){});
+  }
+  $('kOk').addEventListener('click', function(){
+    $('card').classList.remove('show');
+    var n = Object.keys(got).length;
+    if (n >= KIDS.length) {
+      say('ぜんぶ みつけたね！ ほんものは セトリバの いきもの池で さがしてみよう！', function(){});
+      $('zukan').innerHTML = KIDS.map(function(K){ return '<span>' + K.name + '</span>'; }).join('');
+      setTimeout(function(){ $('done').style.display = 'flex'; }, 1200);
+    } else say('あと ' + (KIDS.length - n) + 'ひき！', function(){});
+  });
+  $('again').addEventListener('click', function(){ location.href = location.pathname + (mode === 'preview' ? '?mode=preview' : ''); });
+
+  // カメラなし：ドラッグで傾ける
+  function setupPreview(){
+    var rx = -50, ry = 0, dist = 1.15, down = null;
+    function fit(){ var a = innerWidth / innerHeight; return Math.max(0.85, 1.05 / Math.max(a, 0.45) * 0.85); }
+    dist = fit();
+    function apply(){ root.setAttribute('rotation', rx + ' ' + ry + ' 0'); root.setAttribute('position', '0 -0.05 ' + (-dist)); }
+    apply();
+    var cv = sceneEl.canvas;
+    cv.addEventListener('pointerdown', function(e){ down = { x: e.clientX, y: e.clientY, rx: rx, ry: ry }; dragMoved = false; });
+    addEventListener('pointermove', function(e){ if (!down) return; var dx = e.clientX - down.x, dy = e.clientY - down.y; if (Math.abs(dx) + Math.abs(dy) > 8) dragMoved = true; ry = Math.max(-50, Math.min(50, down.ry + dx * 0.25)); rx = Math.max(-80, Math.min(0, down.rx + dy * 0.25)); apply(); });
+    addEventListener('pointerup', function(){ down = null; setTimeout(function(){ dragMoved = false; }, 0); });
+    addEventListener('resize', function(){ dist = fit(); apply(); });
+  }
+
+  function start(m){
+    mode = m; $('goCam').disabled = $('goPrev').disabled = true;
+    // 読み上げは、押した操作の中で一度鳴らしておくと、あとから鳴らせる端末が多い
+    if (window.speechSynthesis) { var u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); }
+    Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadScript(LIBS.aframe)])
+      .then(function(){ return m === 'camera' ? loadScript(LIBS.mindar) : null; })
+      .then(function(){ registerComponents(); $('start').style.display = 'none'; $('bar').style.display = 'flex'; updateCount(); buildScene(); })
+      .catch(function(e){ $('goCam').disabled = $('goPrev').disabled = false; var er = $('err'); er.textContent = 'よみこめませんでした。インターネットに つながっているか みてね。（' + e.message + '）'; er.style.display = 'block'; });
+  }
+  $('goCam').addEventListener('click', function(){
+    if (!window.isSecureContext) { var er = $('err'); er.textContent = 'カメラは https のページでしか使えません。「カメラなしで あそぶ」なら このまま あそべます。'; er.style.display = 'block'; return; }
+    start('camera');
+  });
+  $('goPrev').addEventListener('click', function(){ start('preview'); });
+  $('back').addEventListener('click', function(){ if (window.speechSynthesis) speechSynthesis.cancel(); location.href = location.pathname; });
+  $('snd').addEventListener('click', function(){ sound = !sound; this.textContent = sound ? '🔊' : '🔇'; if (!sound && window.speechSynthesis) speechSynthesis.cancel(); });
+  var q = new URLSearchParams(location.search);
+  if (q.get('err') === 'camera') { var er = $('err'); er.textContent = 'カメラが つかえませんでした。カメラの きょかを みるか、「カメラなしで あそぶ」を おしてね。'; er.style.display = 'block'; }
+  if (q.get('mode') === 'preview') start('preview');
+  window.__KIDS_DEBUG = { got: got, critters: critters };
+})();
+</script>
+</body>
+</html>

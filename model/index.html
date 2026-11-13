@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>セトリバ 立体模型（デモ）</title>
+<script>/* AR は https でしか動かないので、公開先を http で開いたら https へ移す */
+if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) location.replace('https://' + location.host + location.pathname + location.search);</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Yusei+Magic&display=swap" rel="stylesheet">
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<style>
+  :root{--ink:#3B3226;--sub:#6E6352;--paper:#FFFDF7;--cream:#FAF3E1;--sand:#F1E4C4;--mustard:#F2CB45;--green:#2F6B3E;--brick:#C8603A;
+    --font:"Zen Maru Gothic",system-ui,sans-serif;--hand:"Yusei Magic","Zen Maru Gothic",sans-serif}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--cream);color:var(--ink);font-family:var(--font)}
+  body{display:flex;flex-direction:column;min-height:100%}
+  header{padding:12px 16px 6px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  header h1{font-family:var(--hand);font-weight:400;font-size:22px;margin:0}
+  header p{margin:0;font-size:12.5px;color:var(--sub)}
+  .facts{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 8px}
+  .facts span{background:var(--paper);border:2px solid var(--sand);border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700}
+  .stage{position:relative;flex:1;min-height:420px;margin:0 16px;border:3px solid var(--ink);border-radius:18px;overflow:hidden;background:linear-gradient(#e9f3f6,#f7f1e3)}
+  model-viewer{width:100%;height:100%;min-height:420px;--poster-color:transparent}
+  .hot{border:2px solid var(--ink);border-radius:999px;background:var(--paper);color:var(--ink);font:inherit;font-size:12px;font-weight:700;padding:4px 9px;white-space:nowrap;cursor:pointer;box-shadow:2px 2px 0 #0003;transform:translateY(-6px)}
+  .hot{opacity:1}
+  .hot.on{background:var(--mustard)}
+  .tools{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:2}
+  .tools button,.arbtn{font:inherit;font-size:13px;font-weight:700;border:2px solid var(--ink);border-radius:999px;background:var(--paper);color:var(--ink);padding:7px 12px;cursor:pointer}
+  .tools button[aria-pressed="true"]{background:var(--mustard)}
+  .arbtn{position:absolute;right:10px;bottom:10px;background:var(--mustard);font-size:15px;padding:10px 16px}
+  #card{margin:10px 16px 0;background:var(--paper);border:3px solid var(--ink);border-radius:16px;padding:12px 14px;min-height:92px}
+  #card h2{font-size:17px;margin:0 0 4px}
+  #card p{margin:0;font-size:14px;line-height:1.7}
+  .row{display:flex;gap:8px;margin-top:8px}.row button{font:inherit;font-size:13px;font-weight:700;border:2px solid var(--ink);border-radius:999px;background:var(--cream);padding:5px 12px;cursor:pointer}
+  footer{padding:10px 16px 16px;font-size:11.5px;color:var(--sub);line-height:1.6}
+  .noar{display:none;font-size:12px;color:var(--brick);margin:6px 16px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>セトリバ 立体模型</h1>
+  <p>吉井川河川公園（親水広場あたり）に描いた区画の配置を、机の上に置ける模型にしました（デモ）</p>
+</header>
+<div class="facts"><span>長さ 約272m</span><span>5ゾーン・30区画</span><span>池2つ・原っぱ・焚き火ひろば</span><span>土手から見回り＋カメラ4台</span></div>
+
+<div class="stage">
+  <model-viewer id="mv" src="camp.glb" ios-src="camp.usdz" alt="セトリバの区画配置の立体模型" ar ar-modes="webxr scene-viewer quick-look" ar-placement="floor" camera-controls touch-action="pan-y" shadow-intensity="0.8" exposure="1.05" camera-orbit="0deg 50deg 62%" field-of-view="30deg" interaction-prompt="none">
+    <button slot="ar-button" class="arbtn">📱 机の上に置いて見る</button>
+  </model-viewer>
+  <div class="tools">
+    <button type="button" data-view="0deg 50deg 62%">斜めから</button>
+    <button type="button" data-view="0deg 3deg 70%">真上から</button>
+    <button type="button" data-view="-40deg 68deg 40%">入口側から</button>
+    <button type="button" id="tour" aria-pressed="false">▶ 順番に紹介</button>
+  </div>
+</div>
+<p class="noar" id="noar">この端末では「机の上に置く」が使えないため、画面の中で回して見られます（Android の Chrome か iPhone の Safari で開くと置けます）。</p>
+
+<div id="card" aria-live="polite"><h2 id="cH">札を押すと、そのゾーンの説明が出ます</h2><p id="cP">指（マウス）で回す・2本指（ホイール）で寄る。「机の上に置いて見る」で、カメラ越しに机や床へ置けます。</p>
+  <div class="row"><button type="button" id="prev">◀ 前</button><button type="button" id="next">次 ▶</button></div></div>
+
+<footer>※ セトリバは企画中の構想を見せるためのデモです。区画の形は地図上の計測から起こしたもので、現地の測量ではありません。建物とテントの高さは見やすさのため実際より高くしています。施設・料金は仮です。</footer>
+
+<script type="module">
+import { LABELS, toModel } from './camp_model.js';
+const mv = document.getElementById('mv');
+let cur = -1, timer = null;
+const hots = LABELS.map((L, i) => {
+  const b = document.createElement('button');
+  b.className = 'hot'; b.slot = 'hotspot-' + L.id; b.type = 'button';
+  const p = toModel(L.m, L.w, L.h);
+  b.dataset.position = p.join(' ') ; b.dataset.normal = '0 1 0';
+  b.textContent = L.short; b.title = L.name; b.setAttribute('aria-label', L.name);
+  b.addEventListener('click', () => { stopTour(); show(i, true); });
+  mv.appendChild(b); return b;
+});
+function show(i, fly){
+  cur = i; const L = LABELS[i];
+  hots.forEach((h, k) => { h.classList.toggle('on', k === i); h.textContent = k === i ? LABELS[k].name : LABELS[k].short; });
+  document.getElementById('cH').textContent = L.name;
+  document.getElementById('cP').textContent = L.text;
+  if (fly) { const p = toModel(L.m, L.w, 0); mv.cameraTarget = p.map(v => v + 'm').join(' '); mv.cameraOrbit = 'auto 52deg 55%'; }
+}
+function step(d){ show((cur + d + LABELS.length) % LABELS.length, true); }
+function stopTour(){ clearInterval(timer); timer = null; const t = document.getElementById('tour'); t.setAttribute('aria-pressed','false'); t.textContent = '▶ 順番に紹介'; }
+document.getElementById('tour').addEventListener('click', e => {
+  if (timer) return stopTour();
+  e.currentTarget.setAttribute('aria-pressed','true'); e.currentTarget.textContent = '■ 止める';
+  step(1); timer = setInterval(() => step(1), 5000);
+});
+document.getElementById('prev').addEventListener('click', () => { stopTour(); step(-1); });
+document.getElementById('next').addEventListener('click', () => { stopTour(); step(1); });
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+  stopTour(); mv.cameraTarget = 'auto auto auto'; mv.cameraOrbit = b.dataset.view; hots.forEach((h, k) => { h.classList.remove('on'); h.textContent = LABELS[k].short; });
+}));
+mv.addEventListener('load', () => { window.MV_LOADED = true; if (!mv.canActivateAR) document.getElementById('noar').style.display = 'block'; });
+</script>
+</body>
+</html>
