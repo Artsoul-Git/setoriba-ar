@@ -14,8 +14,9 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
   :root{--ink:#3B3226;--sub:#6E6352;--paper:#FFFDF7;--cream:#FAF3E1;--sand:#F1E4C4;--mustard:#F2CB45;--green:#2F6B3E;--brick:#C8603A;
     --font:"Zen Maru Gothic",system-ui,sans-serif;--hand:"Yusei Magic","Zen Maru Gothic",sans-serif}
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:var(--cream);color:var(--ink);font-family:var(--font)}
-  body{display:flex;flex-direction:column;min-height:100%}
+  html{height:100%}
+  body{margin:0;background:var(--cream);color:var(--ink);font-family:var(--font)}
+  body{display:flex;flex-direction:column;min-height:100vh}
   header{padding:12px 16px 6px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
   header h1{font-family:var(--hand);font-weight:400;font-size:22px;margin:0}
   header p{margin:0;font-size:12.5px;color:var(--sub)}
