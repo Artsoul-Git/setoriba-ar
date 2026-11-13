@@ -85,7 +85,7 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
   </div>
 </div>
 
-<div id="bar"><div class="count" id="count"></div><button id="snd" type="button">🔊</button><button id="back" type="button">もどる</button></div>
+<div id="bar"><div class="count" id="count"></div><button id="place" type="button" aria-label="おきかた（つくえ／かべ）">🧭 じどう</button><button id="snd" type="button">🔊</button><button id="back" type="button">もどる</button></div>
 <div id="zoom"><button id="zIn" type="button" aria-label="おおきく">＋</button><span id="zoomVal">100%</span><button id="zOut" type="button" aria-label="ちいさく">－</button></div>
 <div id="hint"><div class="frame"></div><p>えを この わくに いれてね</p></div>
 
@@ -124,6 +124,10 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
   ];
   var mode = null, sceneEl = null, root = null, stage = null, riba = null, critters = [], got = {}, talking = false, sound = true, lineQueue = [], started = false, dragMoved = false;
   var zoom = 1;
+  // 置き方：つくえ（絵が水平）／かべ（絵が立っている＝パソコンの画面・壁のポスター）
+  // 2026-11-14 Kei「PC画面にかざすと真上から見た状態になって分からない」→ かべのときは池を手前に起こして見せる
+  var stand = null, placeMode = 'auto', place = 'table', upDev = null, placeDot = 1, placeSince = 0;
+  var WALL = { tilt: -65, y: -0.3, z: 0.5, scale: 0.85 };   // かべ：床を65度起こし、絵の下はしから手前へ出す
   function $(id){ return document.getElementById(id); }
   function loadScript(src){ return new Promise(function(ok, ng){ var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function(){ ng(new Error(src)); }; document.head.appendChild(s); }); }
 
@@ -248,6 +252,35 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
       },
       appear: function(){ this.pop = 0.001; }
     });
+    // 置き方を決めて、池ごと向きを変える（なめらかに切り替える）
+    AFRAME.registerComponent('placer', {
+      init: function(){
+        this.qT = new THREE.Quaternion(); this.qW = new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(WALL.tilt), 0, 0));
+        this.n = new THREE.Vector3(); this.u = new THREE.Vector3(); this.qc = new THREE.Quaternion(); this.m = new THREE.Matrix4();
+      },
+      tick: function(t, dt){
+        var o = this.el.object3D;
+        if (placeMode === 'auto') {
+          // 傾きセンサーの「上」と、絵の面の向き（法線）をくらべる：平行＝つくえ、直角に近い＝かべ
+          if (mode === 'camera' && upDev && root.object3D.visible && sceneEl.camera) {
+            var a = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * Math.PI / 180;
+            var c = Math.cos(a), s = Math.sin(a);
+            this.u.set(c * upDev[0] - s * upDev[1], s * upDev[0] + c * upDev[1], upDev[2]).normalize();
+            this.n.setFromMatrixColumn(root.object3D.matrixWorld, 2).normalize();
+            sceneEl.camera.getWorldQuaternion(this.qc); this.n.applyQuaternion(this.qc.invert());
+            placeDot = placeDot * 0.9 + Math.abs(this.n.dot(this.u)) * 0.1;
+            var want = place === 'table' ? (placeDot < 0.5 ? 'wall' : 'table') : (placeDot > 0.72 ? 'table' : 'wall');
+            if (want !== place) { if (!placeSince) placeSince = t; else if (t - placeSince > 600) { place = want; placeSince = 0; showPlace(); } }
+            else placeSince = 0;
+          }
+        } else place = placeMode;
+        var k = 1 - Math.exp(-dt / 160), w = place === 'wall';
+        o.quaternion.slerp(w ? this.qW : this.qT, k);
+        o.position.lerp(this.u.set(0, w ? WALL.y : 0, w ? WALL.z : 0), k);
+        var sc = o.scale.x + ((w ? WALL.scale : 1) - o.scale.x) * k; o.scale.setScalar(sc);
+        var fl = sceneEl.querySelector('#floorPic'); if (fl) fl.object3D.visible = o.quaternion.angleTo(this.qT) > 0.2;
+      }
+    });
     AFRAME.registerComponent('critter', {
       schema: { index: { type: 'int' } },
       init: function(){
@@ -310,8 +343,9 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
     var light = document.createElement('a-entity'); light.setAttribute('light', 'type: hemisphere; color: #fff; groundColor: #b9a888; intensity: 1.3');
     var light2 = document.createElement('a-entity'); light2.setAttribute('light', 'type: directional; intensity: 1.1'); light2.setAttribute('position', '0.3 1 0.8');
     root = document.createElement('a-entity');
+    stand = document.createElement('a-entity'); stand.setAttribute('placer', '');   // 置き方（つくえ／かべ）で向きを変える入れ物
     stage = document.createElement('a-entity');   // 指で拡大縮小する入れ物（絵の中心が原点）
-    root.appendChild(stage);
+    root.appendChild(stand); stand.appendChild(stage);
     if (mode === 'camera') {
       document.documentElement.classList.add('cam');
       sceneEl.setAttribute('mindar-image', 'imageTargetSrc: targets.mind; uiScanning: no; uiLoading: yes; filterMinCF: 0.0001; filterBeta: 0.001');
@@ -319,6 +353,9 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
       root.setAttribute('mindar-image-target', 'targetIndex: 0');
       root.addEventListener('targetFound', function(){ $('hint').style.display = 'none'; begin(); });
       root.addEventListener('targetLost', function(){ $('hint').style.display = 'block'; });
+      // かべのとき用の床（絵を手前に倒して敷く）。つくえのときは本物の絵があるので出さない
+      var floorPic = document.createElement('a-plane'); floorPic.id = 'floorPic'; floorPic.setAttribute('width', 1); floorPic.setAttribute('height', 1);
+      floorPic.setAttribute('material', 'shader: flat; src: ../img/ill_river_kids.jpg; transparent: true; opacity: 0.92'); floorPic.setAttribute('visible', false); stage.appendChild(floorPic);
     } else {
       sceneEl.setAttribute('background', 'color: #cfe8ef');
       var pic = document.createElement('a-plane'); pic.setAttribute('width', 1); pic.setAttribute('height', 1);
@@ -392,6 +429,28 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
     });
   }
 
+  // ---- 置き方：傾きセンサーで自動。センサーが無い・迷うときはボタンで「じどう→つくえ→かべ」 ----
+  function showPlace(){
+    var b = $('place'); if (!b) return;
+    var nm = place === 'wall' ? 'かべ' : 'つくえ';
+    b.textContent = placeMode === 'auto' ? (upDev ? '🧭 じどう：' + nm : '🧭 つくえ') : (placeMode === 'wall' ? '🖥 かべ' : '📄 つくえ');
+    if (placeMode === 'auto' && !upDev && mode === 'camera') b.textContent = '🧭 つくえ（おして かえる）';
+  }
+  function listenTilt(){
+    addEventListener('deviceorientation', function(e){
+      if (e.beta == null || e.gamma == null) return;
+      var b = e.beta * Math.PI / 180, g = e.gamma * Math.PI / 180;
+      var first = !upDev;
+      upDev = [-Math.sin(g) * Math.cos(b), Math.sin(b), Math.cos(g) * Math.cos(b)];   // スマホから見た「真上」
+      if (first) showPlace();
+    });
+  }
+  $('place').addEventListener('click', function(){
+    placeMode = placeMode === 'auto' ? 'table' : placeMode === 'table' ? 'wall' : 'auto';
+    if (placeMode === 'auto' && !upDev) placeMode = 'table';   // センサーが無いときは つくえ⇔かべ の2つ
+    placeSince = 0; if (placeMode !== 'auto') place = placeMode;
+    showPlace();
+  });
   function updateCount(){
     $('count').innerHTML = KIDS.map(function(K){ return '<i class="' + (got[K.id] ? 'got' : '') + '">' + (got[K.id] ? '✓' : '?') + '</i>'; }).join('') + ' <b>' + Object.keys(got).length + '/' + KIDS.length + '</b>';
   }
@@ -442,11 +501,15 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
     if (window.speechSynthesis) { var u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); }
     Promise.all([document.fonts ? document.fonts.ready : Promise.resolve(), loadScript(LIBS.aframe)])
       .then(function(){ return m === 'camera' ? loadScript(LIBS.mindar) : null; })
-      .then(function(){ registerComponents(); $('start').style.display = 'none'; $('bar').style.display = 'flex'; $('zoom').style.display = 'flex'; updateCount(); buildScene(); })
+      .then(function(){ registerComponents(); $('start').style.display = 'none'; $('bar').style.display = 'flex'; $('zoom').style.display = 'flex'; updateCount(); showPlace(); buildScene(); })
       .catch(function(e){ $('goCam').disabled = $('goPrev').disabled = false; var er = $('err'); er.textContent = 'よみこめませんでした。インターネットに つながっているか みてね。（' + e.message + '）'; er.style.display = 'block'; });
   }
   $('goCam').addEventListener('click', function(){
     if (!window.isSecureContext) { var er = $('err'); er.textContent = 'カメラは https のページでしか使えません。「カメラなしで あそぶ」なら このまま あそべます。'; er.style.display = 'block'; return; }
+    // iPhone は傾きセンサーに許可が要る（ボタンを押したその場で聞く）。断られても つくえ／かべ はボタンで選べる
+    var D = window.DeviceOrientationEvent;
+    if (D && typeof D.requestPermission === 'function') D.requestPermission().then(function(r){ if (r === 'granted') listenTilt(); showPlace(); }).catch(function(){ showPlace(); });
+    else listenTilt();
     start('camera');
   });
   $('goPrev').addEventListener('click', function(){ start('preview'); });
@@ -455,7 +518,7 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
   var q = new URLSearchParams(location.search);
   if (q.get('err') === 'camera') { var er = $('err'); er.textContent = 'カメラが つかえませんでした。カメラの きょかを みるか、「カメラなしで あそぶ」を おしてね。'; er.style.display = 'block'; }
   if (q.get('mode') === 'preview') start('preview');
-  window.__KIDS_DEBUG = { got: got, critters: critters, setZoom: setZoom, get zoom(){ return zoom; } };
+  window.__KIDS_DEBUG = { got: got, critters: critters, setZoom: setZoom, get zoom(){ return zoom; }, get place(){ return place; }, get stand(){ return stand; }, setUp: function(v){ upDev = v; showPlace(); } };
 })();
 </script>
 </body>
