@@ -227,7 +227,9 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
 
   // 絵の上の場所（絵の幅を1・中心が原点・右が+x・上が+y）。高さ（z）は層ごと
   var POND = { cx: -0.1, cy: -0.31, rx: 0.3, ry: 0.11 };
-  var H = { water: 0.03, surface: 0.07, air: 0.3 };
+  // 2026-11-14 Kei「水の中と水の上の差が分からない」→ 水面を高く上げ、水中は深さを分けて泳がせる
+  var H = { water: 0.06, surface: 0.2, air: 0.45 };
+  var DEPTH = { medaka: 0.15, otama: 0.1, yago: 0.035, dojo: 0.015 };   // 水中のそれぞれの高さ（底＝0）
   function registerComponents(){
     var THREE = AFRAME.THREE;
     AFRAME.registerComponent('riba', {
@@ -264,12 +266,12 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
         var i = this.data.index, id = this.K.id, a = this.ph + t / 1000;
         if (id === 'tonbo') { var s = a * 0.55; return [Math.sin(s) * 0.3, 0.05 + Math.sin(2 * s) * 0.16, H.air + Math.sin(3 * s) * 0.04 + (Math.sin(t / 900) > 0.9 ? 0.03 : 0)]; }
         if (id === 'chou') { var c = a * 0.32; return [-0.12 + Math.cos(c) * 0.28, 0.1 + Math.sin(c * 1.3) * 0.22, H.air - 0.05 + Math.sin(c * 2.6) * 0.06 + Math.abs(Math.sin(t / 260)) * 0.02]; }
-        if (id === 'kaeru') return [POND.cx + 0.2, POND.cy + 0.05, H.surface - 0.035];
+        if (id === 'kaeru') return [POND.cx + 0.2, POND.cy + 0.05, H.surface + 0.003];
         var sp = { medaka: 0.55, otama: 0.45, yago: 0.3, dojo: 0.25, amenbo: 0.8 }[id] || 0.4;
         var aa = this.ph + t / 1000 * sp, rx = POND.rx * (0.5 + 0.4 * ((i * 37) % 10) / 10), ry = POND.ry * (0.45 + 0.45 * ((i * 53) % 10) / 10);
         var x = POND.cx + Math.cos(aa) * rx, y = POND.cy + Math.sin(aa * (i % 2 ? 1 : -1)) * ry;
         if (id === 'amenbo') x += Math.sin(t / 260) * 0.02;
-        var z = this.K.zone === 'surface' ? H.surface : (id === 'dojo' ? 0.012 : H.water + Math.sin(t / 700 + i) * 0.008);
+        var z = this.K.zone === 'surface' ? H.surface + 0.002 : DEPTH[id] + Math.sin(t / 700 + i) * (id === 'dojo' ? 0.003 : 0.015);
         return [x, y, z];
       },
       tick: function(t, dt){
@@ -329,11 +331,22 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
     water.addEventListener('loaded', function(){
       var geo = new THREE.CircleGeometry(1, 48); geo.scale(POND.rx + 0.03, POND.ry + 0.03, 1);
       var m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: '#6fc3dc', transparent: true, opacity: 0.38, roughness: 0.15, depthWrite: false }));
-      m.position.set(POND.cx, POND.cy, H.surface - 0.008); water.setObject3D('mesh', m);
+      m.position.set(POND.cx, POND.cy, H.surface); water.setObject3D('mesh', m);
+      // 水の壁（水槽のような側面）と、少し濃い底：水の深さが見えるように
+      var wall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, H.surface, 48, 1, true), new THREE.MeshStandardMaterial({ color: '#5fb8d6', transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, roughness: 0.2 }));
+      wall.scale.set(POND.rx + 0.03, 1, POND.ry + 0.03); wall.rotation.x = Math.PI / 2; wall.position.set(POND.cx, POND.cy, H.surface / 2); water.object3D.add(wall);
+      var rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.006, 6, 64), new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.7 }));
+      rim.scale.set(POND.rx + 0.03, POND.ry + 0.03, 1); rim.position.set(POND.cx, POND.cy, H.surface); water.object3D.add(rim);
+      var floor = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({ color: '#2f7f9a', transparent: true, opacity: 0.22, depthWrite: false }));
+      floor.position.set(POND.cx, POND.cy, 0.002); water.object3D.add(floor);
+      // 底から上がる泡
+      var bubbles = [];
+      for (var bi = 0; bi < 8; bi++) { var bb = new THREE.Mesh(new THREE.SphereGeometry(0.006 + (bi % 3) * 0.002, 10, 8), new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.75, roughness: 0.1 })); bb.userData.p = bi / 8; bb.userData.x = POND.cx + Math.cos(bi * 2.4) * POND.rx * 0.7; bb.userData.y = POND.cy + Math.sin(bi * 2.4) * POND.ry * 0.6; water.object3D.add(bb); bubbles.push(bb); }
+      (function rise(){ var t = performance.now() / 1000; bubbles.forEach(function(bb){ var k = (t * 0.18 + bb.userData.p) % 1; bb.position.set(bb.userData.x + Math.sin(t * 3 + bb.userData.p * 9) * 0.006, bb.userData.y, 0.01 + k * (H.surface - 0.015)); bb.visible = k < 0.97; }); requestAnimationFrame(rise); })();
       // 層の札：みずの なか／みずの うえ／そら（絵の左はしの柱）
       var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, H.air + 0.04, 6), new THREE.MeshStandardMaterial({ color: '#8a6a45' }));
       pole.rotation.x = Math.PI / 2; pole.position.set(-0.44, -0.22, (H.air + 0.04) / 2); water.object3D.add(pole);
-      [['みずの なか', H.water, '#bfe6f2'], ['みずの うえ', H.surface + 0.01, '#e8f4d0'], ['そら', H.air, '#fff4c2']].forEach(function(L){
+      [['みずの なか', H.water + 0.03, '#bfe6f2'], ['みずの うえ', H.surface + 0.02, '#e8f4d0'], ['そら', H.air, '#fff4c2']].forEach(function(L){
         var sp = labelSprite(THREE, L[0], L[2]); sp.position.set(-0.44, -0.22, L[1]); sp.center.set(-0.08, 0.5); water.object3D.add(sp);
       });
     });
