@@ -43,7 +43,7 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
 
   /* かざす案内 */
   #hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:15;display:none;pointer-events:none;text-align:center;color:#fff;text-shadow:0 1px 4px #000}
-  #hint .frame{width:min(78vw,520px);aspect-ratio:1400/933;border:3px dashed #fffc;border-radius:14px;margin:0 auto 12px}
+  #hint .frame{width:min(78vw,90vh,520px);aspect-ratio:1400/933;border:3px dashed #fffc;border-radius:14px;margin:0 auto 12px}
   #hint p{margin:0;font-weight:700;font-size:16px}
 
   /* 説明の札 */
@@ -304,6 +304,18 @@ if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1)$/.test(location
     if (mode === 'camera') {
       sceneEl.addEventListener('arError', function(){
         location.href = location.pathname + '?err=camera';
+      });
+      // 縦横の切り替え：カメラを開き直す（MindAR は最初の向きで追跡の計算を作るため）
+      var land = innerWidth > innerHeight, otimer = null;
+      addEventListener('resize', function(){
+        var now = innerWidth > innerHeight; if (now === land) return; land = now;
+        clearTimeout(otimer);
+        otimer = setTimeout(function(){
+          var sys = sceneEl.systems['mindar-image-system']; if (!sys) return;
+          $('hint').style.display = 'block';
+          try { sys.stop(); } catch (e) {}
+          setTimeout(function(){ sys.start(); }, 400);
+        }, 500);
       });
     }
   }
